@@ -37,9 +37,8 @@ void Timeline::Initialize(std::string file_name) {
 bool Timeline::Initialized() const { return initialized_; }
 
 // Write event to the Horovod Timeline file.
-void Timeline::WriteEvent(const std::string& tensor_name,
-                          const std::string& op_name, const char phase,
-                          const std::string& args) {
+void Timeline::WriteEvent(const std::string& tensor_name, const char phase,
+                          const std::string& op_name, const std::string& args) {
   if (!file_.good()) {
     return;
   }
@@ -77,7 +76,10 @@ void Timeline::WriteEvent(const std::string& tensor_name,
   }
 
   file_ << "{";
-  file_ << "\"name\": \"" << op_name << "\"";
+  if (phase != 'E') {
+    // Not necessary for ending event.
+    file_ << "\"name\": \"" << op_name << "\"";
+  }
   file_ << ", \"ph\": \"" << phase << "\"";
   file_ << ", \"ts\": " << ts_micros << "";
   file_ << ", \"pid\": " << tensor_idx << "";
@@ -106,9 +108,11 @@ void Timeline::NegotiateStart(const std::string& tensor_name,
   if (!initialized_) {
     return;
   }
+  assert(tensor_states_[tensor_name] == TimelineState::UNKNOWN);
   auto event_category =
       "NEGOTIATE_" + MPIRequest::RequestType_Name(request_type);
-  WriteEvent(tensor_name, event_category, 'B');
+  WriteEvent(tensor_name, 'B', event_category);
+  tensor_states_[tensor_name] = TimelineState::NEGOTIATING;
 }
 
 void Timeline::NegotiateRankReady(const std::string& tensor_name,
@@ -116,17 +120,17 @@ void Timeline::NegotiateRankReady(const std::string& tensor_name,
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, std::to_string(rank), 'X');
+  assert(tensor_states_[tensor_name] == TimelineState::NEGOTIATING);
+  WriteEvent(tensor_name, 'X', std::to_string(rank));
 }
 
-void Timeline::NegotiateEnd(const std::string& tensor_name,
-                            const MPIRequest::RequestType request_type) {
+void Timeline::NegotiateEnd(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  auto event_category =
-      "NEGOTIATE_" + MPIRequest::RequestType_Name(request_type);
-  WriteEvent(tensor_name, event_category, 'E');
+  assert(tensor_states_[tensor_name] == TimelineState::NEGOTIATING);
+  WriteEvent(tensor_name, 'E');
+  tensor_states_.erase(tensor_name);
 }
 
 void Timeline::Start(const std::string& tensor_name,
@@ -134,64 +138,82 @@ void Timeline::Start(const std::string& tensor_name,
   if (!initialized_) {
     return;
   }
+  assert(tensor_states_[tensor_name] == TimelineState::UNKNOWN);
   auto event_category = MPIResponse::ResponseType_Name(response_type);
-  WriteEvent(tensor_name, event_category, 'B');
+  WriteEvent(tensor_name, 'B', event_category);
+  tensor_states_[tensor_name] = TimelineState::TOP_LEVEL;
 }
 
 void Timeline::WaitForDataStart(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "WAIT_FOR_DATA", 'B');
+  assert(tensor_states_[tensor_name] == TimelineState::TOP_LEVEL);
+  WriteEvent(tensor_name, 'B', "WAIT_FOR_DATA");
+  tensor_states_[tensor_name] = TimelineState::WAITING_FOR_DATA;
 }
 
 void Timeline::WaitForDataEnd(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "WAIT_FOR_DATA", 'E');
+  assert(tensor_states_[tensor_name] == TimelineState::WAITING_FOR_DATA);
+  WriteEvent(tensor_name, 'E');
+  tensor_states_[tensor_name] = TimelineState::TOP_LEVEL;
 }
 
 void Timeline::NcclInitStart(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "NCCL_INIT", 'B');
+  assert(tensor_states_[tensor_name] == TimelineState::TOP_LEVEL);
+  WriteEvent(tensor_name, 'B', "NCCL_INIT");
+  tensor_states_[tensor_name] = TimelineState::IN_NCCL_INIT;
 }
 
 void Timeline::NcclInitEnd(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "NCCL_INIT", 'E');
+  assert(tensor_states_[tensor_name] == TimelineState::IN_NCCL_INIT);
+  WriteEvent(tensor_name, 'E');
+  tensor_states_[tensor_name] = TimelineState::TOP_LEVEL;
 }
 
 void Timeline::QueueStart(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "QUEUE", 'B');
+  assert(tensor_states_[tensor_name] == TimelineState::TOP_LEVEL);
+  WriteEvent(tensor_name, 'B', "QUEUE");
+  tensor_states_[tensor_name] = TimelineState::QUEUEING;
 }
 
 void Timeline::QueueEnd(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "QUEUE", 'E');
+  assert(tensor_states_[tensor_name] == TimelineState::QUEUEING);
+  WriteEvent(tensor_name, 'E');
+  tensor_states_[tensor_name] = TimelineState::TOP_LEVEL;
 }
 
 void Timeline::ProcessStart(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "PROCESS", 'B');
+  assert(tensor_states_[tensor_name] == TimelineState::TOP_LEVEL);
+  WriteEvent(tensor_name, 'B', "PROCESS");
+  tensor_states_[tensor_name] = TimelineState::PROCESSING;
 }
 
 void Timeline::ProcessEnd(const std::string& tensor_name) {
   if (!initialized_) {
     return;
   }
-  WriteEvent(tensor_name, "PROCESS", 'E');
+  assert(tensor_states_[tensor_name] == TimelineState::PROCESSING);
+  WriteEvent(tensor_name, 'E');
+  tensor_states_[tensor_name] = TimelineState::TOP_LEVEL;
 }
 
 namespace {
@@ -233,18 +255,38 @@ std::string TFDataType_Name(DataType dtype) {
 } // namespace
 
 void Timeline::End(const std::string& tensor_name,
-                   const MPIResponse::ResponseType response_type,
                    const Tensor* output_tensor) {
   if (!initialized_) {
     return;
   }
-  auto event_category = MPIResponse::ResponseType_Name(response_type);
+
+  // Pop out of current state, if applicable.
+  switch (tensor_states_[tensor_name]) {
+  case TimelineState::WAITING_FOR_DATA:
+    WaitForDataEnd(tensor_name);
+    break;
+  case TimelineState::IN_NCCL_INIT:
+    NcclInitEnd(tensor_name);
+    break;
+  case TimelineState::QUEUEING:
+    QueueEnd(tensor_name);
+    break;
+  case TimelineState::PROCESSING:
+    ProcessEnd(tensor_name);
+    break;
+  case TimelineState::TOP_LEVEL:
+    break;
+  default:
+    // Impossible state.
+    assert(false);
+  }
+
   std::stringstream args;
   if (output_tensor != nullptr) {
     args << "\"dtype\": \"" << TFDataType_Name(output_tensor->dtype()) << "\"";
     args << ", \"shape\": \"" << output_tensor->shape().DebugString() << "\"";
   }
-  WriteEvent(tensor_name, event_category, 'E', args.str());
+  WriteEvent(tensor_name, 'E', "", args.str());
 }
 
 } // namespace tensorflow
