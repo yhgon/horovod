@@ -76,11 +76,11 @@ void Timeline::WriteEvent(const std::string& tensor_name, const char phase,
   }
 
   file_ << "{";
+  file_ << "\"ph\": \"" << phase << "\"";
   if (phase != 'E') {
     // Not necessary for ending event.
-    file_ << "\"name\": \"" << op_name << "\"";
+    file_ << ", \"name\": \"" << op_name << "\"";
   }
-  file_ << ", \"ph\": \"" << phase << "\"";
   file_ << ", \"ts\": " << ts_micros << "";
   file_ << ", \"pid\": " << tensor_idx << "";
   if (phase == 'X') {
