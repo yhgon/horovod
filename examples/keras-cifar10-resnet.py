@@ -37,11 +37,11 @@ config.gpu_options.visible_device_list = str(hvd.local_rank())
 K.set_session(tf.Session(config=config))
 
 # Training parameters
-batch_size = 128  # orig paper trained all networks with batch_size=128
+batch_size = 32  # orig paper trained all networks with batch_size=128
 epochs = 200
 data_augmentation = True
 num_classes = 10
-learning_rate = 0.001
+learning_rate = 0.01
 
 # Subtracting pixel mean improves accuracy
 subtract_pixel_mean = True
@@ -345,7 +345,7 @@ else:
     model = resnet_v1(input_shape=input_shape, depth=depth)
 
 # Horovod: adjust learning rate based on number of GPUs.
-opt = keras.optimizers.Adam(lr=learning_rate * hvd.size() )
+opt = keras.optimizers.SGD(learning_rate * hvd.size(), momentum=0.9)
 
 # Horovod: add Horovod Distributed Optimizer.
 opt = hvd.DistributedOptimizer(opt)
