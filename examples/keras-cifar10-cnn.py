@@ -149,6 +149,6 @@ if hvd.rank() == 0:
 	print('Saved trained model at %s ' % model_path)
 
 	# Score trained model.
-	score = model.evaluate(x_test, y_test, verbose=0)
+	scores = model.evaluate(x_test, y_test, verbose=0)
 	print('Test loss:', scores[0])
 	print('Test accuracy:', scores[1])
