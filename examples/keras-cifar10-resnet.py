@@ -423,7 +423,7 @@ else:
 		    verbose=verbose,
 		    workers=4,
                     validation_data=test_iter,
-                    validation_steps=  len(test_iter) // hvd.size() )
+                    validation_steps=  3*len(test_iter) // hvd.size() )
 
 if hvd.rank() == 0:	
 	# Save model and weights
