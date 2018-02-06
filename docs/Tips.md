@@ -1,4 +1,4 @@
-
+## TIPs 
 I'll briefly introduce how to run horovod for my work.
 
 step1.
@@ -20,7 +20,7 @@ step4. docker pull & run  some repositories to be familiar with docker command
 such as ubuntu  nvidia/cuda  nvcr.io/nvidia/tensorflow 
 
 useful docker commands are 
-[
+```
 docker images
 docker pull
 docker run 
@@ -32,12 +32,13 @@ docker rm
 docker kill
 docker rmi 
 docker commit
-]
+```
  
 step5. docker build nvcr.io to private repository to bypass APIkey
 singularity build have some issue with nvcr.io API key. 
 private docker repositories is also good solution.
-docker build -t mycuda:01 -f ./Dockerfile . 
+```docker build -t mycuda:01 -f ./Dockerfile . 
+```
 
 I recommend to prepare docker build server and apt-cache servers to speed up these thing 
 prepare apt-cache server for speed up 
@@ -47,22 +48,22 @@ use this git url.  https://github.com/yhgon/horovod-tf-uber
 check and review it. you can switch python version
 
 step7. build dockerfiles 
-docker build -t hvd:01 -f ./Dockerfile.horovod . 
+```docker build -t hvd:01 -f ./Dockerfile.horovod . 
 docker save hvd:01 -output hvd-01.tar
-
+```
 step8. docker run test 
-nvidia-docker run -ti hvd:01 bash 
+```nvidia-docker run -ti hvd:01 bash ```
 
 step9. convert docker image to singularity 
-docker run -v/your_localtion:/output /singularityware/docker2singularity hvd:01
+```docker run -v/your_localtion:/output /singularityware/docker2singularity hvd:01```
 
 step10. mpirun on baremetal for each docker in multinode
 simple command would  be  
 
-srun -N8 -p gpu_node --comment=docker bash  
+```srun -N8 -p gpu_node --comment=docker bash  
 module load singularity openmpi
 mpirun -n 32  singularity shell --nv a.img  python train.py 
-
+```
 step11. enjoy horovod
 
 step12. use example to be familar with horovod optimizer 
