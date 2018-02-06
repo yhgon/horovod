@@ -9,7 +9,7 @@ ENV CUDNN VERSION=7
 ENV NCCL_VERSION=2.1.2-1
 
 # Python 2.7 or 3.5 is supported by Ubuntu Xenial out of the box
-ENV PYTHON_VERSION=2.7
+ENV PYTHON_VERSION=3.5
 
 RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
 
