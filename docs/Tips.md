@@ -9,7 +9,7 @@ configure network storage ( NFS, RAID, Cache)
 configure ldap, slurm + module environment same as HPC cluster
 
 step2. 
-register ngc.nvidia.com for nvcr.io repository. 
+register NGC  for nvcr.io repository. URL is http://ngc.nvidia.com
  
 
 step3. module-environment configure 
