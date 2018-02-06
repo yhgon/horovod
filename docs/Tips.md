@@ -31,7 +31,7 @@ docker rm
 docker kill
 docker rmi 
 docker commit
-
+ 
 step5. docker build nvcr.io to private repository to bypass APIkey
 singularity build have some issue with nvcr.io API key. 
 private docker repositories is also good solution.
