@@ -20,6 +20,7 @@ step4. docker pull & run  some repositories to be familiar with docker command
 such as ubuntu  nvidia/cuda  nvcr.io/nvidia/tensorflow 
 
 useful docker commands are 
+'''
 docker images
 docker pull
 docker run 
@@ -31,6 +32,7 @@ docker rm
 docker kill
 docker rmi 
 docker commit
+ '''
  
 step5. docker build nvcr.io to private repository to bypass APIkey
 singularity build have some issue with nvcr.io API key. 
