@@ -41,8 +41,7 @@ private docker repositories is also good solution.
     docker build -t mycuda:01 -f ./Dockerfile . 
 ```
 
-I recommend to prepare docker build server and apt-cache servers to speed up these thing 
-prepare apt-cache server for speed up 
+I recommend to prepare docker build server and apt-cache servers to speed up downloading for dependent libraries and applications
 
 step6. get custom Dockerfiles for horovod 
 use this git url.  https://github.com/yhgon/horovod-tf-uber 
