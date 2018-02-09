@@ -1,43 +1,64 @@
 FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 #tag mean c9:CUDA Toolkit 9.0, d7:cuDNN7, tf15:Tensorflow R1.5.0
 # TensorFlow version is tightly coupled to CUDA and cuDNN so it should be selected carefully
-ENV TENSORFLOW_VERSION=1.5.0
+ENV TF_VER=1.5.0
 
 #CUDA toolkit version
-ENV CUDA_VERSION=9.0
-ENV CUDNN VERSION=7
-ENV NCCL_VERSION=2.1.2-1
+ENV CUDA_VER=9.0
+ENV CUDNN VER=7
+ENV NCCL_VER=2.1.2-1
 
 # Python 2.7 or 3.5 is supported by Ubuntu Xenial out of the box
-ENV PYTHON_VERSION=3.5
+ENV PY_VER=3.5
 
 RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
 
+############## install utilities #####################
 RUN apt-get update && apt-get install -y --no-install-recommends  --allow-downgrades \
         build-essential \
         cmake \
         git \
         curl \
         vim \
+	less \
+	nano \
         wget \
         ca-certificates \
-        libnccl2=$NCCL_VERSION+cuda$CUDA_VERSION \
-        libnccl-dev=$NCCL_VERSION+cuda$CUDA_VERSION \
+        libnccl2=$NCCL_VER+cuda$CUDA_VER \
+        libnccl-dev=$NCCL_VER+cuda$CUDA_VER \
         libjpeg-dev \
         libpng-dev \
-        python$PYTHON_VERSION \
-        python$PYTHON_VERSION-dev
+        python$PY_VER \
+        python$PY_VER-dev \
+	rsync \
+	swig \
+	unzip \
+	zip
 
-RUN ln -s /usr/bin/python$PYTHON_VERSION /usr/bin/python
+############ configure python ###################
+ENV PYTHONIOENCODING utf-8
+RUN rm -f /usr/bin/python && \
+    rm -f /usr/bin/python`echo $PY_VER | cut -c1-1` && \
+    ln -s /usr/bin/python$PY_VER /usr/bin/python && \
+    ln -s /usr/bin/python$PY_VER /usr/bin/python`echo $PY_VER | cut -c1-1`
 
+############# pip install   ####################
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
-    rm get-pip.py
+    rm get-pip.py 
 
 
+######## install dependency files for convinence  #########
+RUN pip install --no-cache-dir \
+    pandas \
+    jupyter 
+
+# TF 1.0 upstream needs this symlink
+RUN mkdir -p /usr/lib/x86_64-linux-gnu/include/ && \
+     ln -s /usr/include/cudnn.h /usr/lib/x86_64-linux-gnu/include/cudnn.h
 
 
-######## install dependency files for tacotron  #########
+######## install dependency files for tacotron  TODO  seperate for train/for preprocessing  #########
 RUN pip install --no-cache-dir \
     appnope==0.1.0 \
     audioread==2.1.5 \
@@ -152,7 +173,7 @@ RUN pip install --no-cache-dir \
     inflect==0.2.5 
 
 
-# Install Open MPI
+########### Install Open MPI 3.0.0 #######################
 RUN mkdir /tmp/openmpi && \
     cd /tmp/openmpi && \
     wget https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz && \
@@ -164,14 +185,15 @@ RUN mkdir /tmp/openmpi && \
     ldconfig && \
     rm -rf /tmp/openmpi
 
-#Install Tensorflow and Keras after OpenMPI Install
-RUN pip install --no-cache-dir tensorflow-gpu==$TENSORFLOW_VERSION
+#########  #Install Tensorflow and Keras after OpenMPI Install  for debug ###############
+RUN pip install --no-cache-dir tensorflow-gpu==$TF_VER
 RUN pip install --no-cache-dir keras
 RUN pip install --no-cache-dir h5py
+RUN pip install --no-cache-dir jupyter 
 
 
 # Install Horovod, temporarily using CUDA stubs
-RUN ldconfig /usr/local/cuda-$CUDA_VERSION/targets/x86_64-linux/lib/stubs && \
+RUN ldconfig /usr/local/cuda-$CUDA_VER/targets/x86_64-linux/lib/stubs && \
     HOROVOD_GPU_ALLREDUCE=NCCL pip install --no-cache-dir horovod && \
     ldconfig
 
@@ -200,6 +222,9 @@ RUN cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_confi
     echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new && \
     mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config
 
+#############################################################
+RUN  git clone      https://github.com/carpedm20/multi-speaker-tacotron-tensorflow.git 
+
 # Download examples
 RUN apt-get install -y --no-install-recommends subversion && \
     svn checkout https://github.com/uber/horovod/trunk/examples && \
@@ -207,3 +232,9 @@ RUN apt-get install -y --no-install-recommends subversion && \
 
 WORKDIR "/examples"
 
+######### port for TensorBoard and jupyter
+EXPOSE 6006
+EXPOSE 8888 
+
+################ remove cache for apt-get ###################
+RUN     rm -r /var/lib/apt/lists/*
