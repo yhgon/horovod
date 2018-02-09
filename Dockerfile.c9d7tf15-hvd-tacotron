@@ -257,4 +257,4 @@ EXPOSE 8888
 
 ################ remove cache for apt-get ###################
 RUN     rm -r /var/lib/apt/lists/*
-
+export LD_LIBRARY_PATH=:$LD_LIBRARY_PATH:/usr/local/cuda-9.0/targets/x86_64-linux/lib/stubs
