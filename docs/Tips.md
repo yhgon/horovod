@@ -59,7 +59,7 @@ step8. docker run test
 
 step9. convert docker image to singularity 
 ```
-    docker run -v/your_localtion:/output /singularityware/docker2singularity hvd:01
+    docker run -v/your_localtion:/output singularityware/docker2singularity hvd:01
 ```
 
 step10. mpirun on baremetal for each docker in multinode
