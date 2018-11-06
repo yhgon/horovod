@@ -29,6 +29,7 @@ import os
 
 # Horovod: initialize Horovod.
 hvd.init()
+verbose = 1 if hvd.rank() == 0 else 0
 
 # Horovod: pin GPU to be used to process local rank (one GPU per process)
 config = tf.ConfigProto()
@@ -60,11 +61,11 @@ subtract_pixel_mean = True
 # ResNet164 |27(18)| -----     | 94.07     | -----     | 94.54     | ---(---)
 # ResNet1001| (111)| -----     | 92.39     | -----     | 95.08+-.14| ---(---)
 # ---------------------------------------------------------------------------
-n = 9
+n = 6
 
 # Model version
 # Orig paper: version = 1 (ResNet v1), Improved ResNet: version = 2 (ResNet v2)
-version = 1
+version = 2
 
 # Computed depth from supplied model parameter n
 if version == 1:
@@ -90,11 +91,11 @@ if subtract_pixel_mean:
     x_train_mean = np.mean(x_train, axis=0)
     x_train -= x_train_mean
     x_test -= x_train_mean
-
-print('x_train shape:', x_train.shape)
-print(x_train.shape[0], 'train samples')
-print(x_test.shape[0], 'test samples')
-print('y_train shape:', y_train.shape)
+if verbose:
+    print('x_train shape:', x_train.shape)
+    print(x_train.shape[0], 'train samples')
+    print(x_test.shape[0], 'test samples')
+    print('y_train shape:', y_train.shape)
 
 # Convert class vectors to binary class matrices.
 y_train = keras.utils.to_categorical(y_train, num_classes)
@@ -353,8 +354,9 @@ opt = hvd.DistributedOptimizer(opt)
 model.compile(loss='categorical_crossentropy',
               optimizer=opt,
               metrics=['accuracy'])
-model.summary()
-print(model_type)
+if verbose:
+    model.summary()
+    print(model_type)
 
 if hvd.rank() == 0:
 	# Prepare model model saving directory.
@@ -364,7 +366,6 @@ if hvd.rank() == 0:
 		os.makedirs(save_dir)
 	filepath = os.path.join(save_dir, model_name)
 
-verbose = 1 if hvd.rank() == 0 else 0
 callbacks = [
     hvd.callbacks.BroadcastGlobalVariablesCallback(0),
     hvd.callbacks.MetricAverageCallback(),
@@ -378,7 +379,8 @@ test_batches = len(x_test) // batch_size
 
 # Run training, with or without data augmentation.
 if not data_augmentation:
-    print('Not using data augmentation.')
+    if verbose:	
+        print('Not using data augmentation.')
     model.fit(x_train, y_train,
               batch_size=batch_size ,
               steps_per_epoch=train_batches // hvd.size(),         
@@ -388,7 +390,8 @@ if not data_augmentation:
               validation_steps=  test_batches // hvd.size(),
               shuffle=True)
 else:
-    print('Using real-time data augmentation.')
+    if verbose:    
+        print('Using real-time data augmentation.')
     # This will do preprocessing and realtime data augmentation:
     train_gen = ImageDataGenerator(
         # set input mean to 0 over the dataset
